@@ -421,6 +421,42 @@
                 margin: 10px;
             }
         }
+        .workout-exercise {
+    background: #333;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-left: 3px solid #ff6b35;
+}
+
+.workout-exercise h5 {
+    margin: 0 0 5px 0;
+    color: #fff;
+}
+
+.workout-exercise p {
+    margin: 0;
+    font-size: 12px;
+    color: #ccc;
+}
+
+.search-result {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.search-result:hover {
+    background-color: #404040;
+}
+
+[data-add-options] {
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
     </style>
 </head>
 <body>
@@ -677,6 +713,19 @@
                     <input type="text" id="new-exercise-muscles" placeholder="es. Petto, Spalle, Tricipiti">
                 </div>
                 <div class="input-group">
+                    <label>Tipo di Esecuzione</label>
+                    <select id="new-exercise-execution">
+                        <option value="Rep(+kg)*Serie">Rep(+kg)*Serie</option>
+                        <option value="Max Rep">Max Rep</option>
+                        <option value="Max Weight">Max Weight</option>
+                        <option value="Rep(Execution Time)*Serie">Rep(Execution Time)*Serie</option>
+                        <option value="Max Time">Max Time</option>
+                        <option value="Distanza massima">Distanza massima</option>
+                        <option value="AMRAP">AMRAP</option>
+                        <option value="EMOM">EMOM</option>
+                    </select>
+                </div>
+                <div class="input-group">
                     <label>Serie</label>
                     <input type="number" id="exercise-sets" value="3" min="1">
                 </div>
@@ -694,7 +743,82 @@
 
         <button class="fab" onclick="showAddOptions()">+</button>
     </div>
+    <!-- WORKOUT PLANS MODALS -->
+<div class="modal" id="workout-plan-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Nuova Scheda</h3>
+            <button class="close-btn" onclick="closeModal('workout-plan-modal')">&times;</button>
+        </div>
+        <div class="input-group">
+            <label>Nome Scheda</label>
+            <input type="text" id="plan-name" placeholder="Push/Pull/Legs, Full Body...">
+        </div>
+        <div class="input-group">
+            <label>Descrizione</label>
+            <textarea id="plan-description" rows="3" placeholder="Descrizione della scheda..."></textarea>
+        </div>
+        <div class="input-group">
+            <label>Frequenza (giorni/settimana)</label>
+            <input type="number" id="plan-frequency" value="3" min="1" max="7">
+        </div>
+        <button class="btn btn-primary" onclick="createWorkoutPlan()">Crea Scheda</button>
+    </div>
+</div>
 
+<div class="modal" id="workout-session-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Nuovo Workout</h3>
+            <button class="close-btn" onclick="closeModal('workout-session-modal')">&times;</button>
+        </div>
+        <div class="input-group">
+            <label>Nome Workout</label>
+            <input type="text" id="workout-name" placeholder="Push Day, Legs Day...">
+        </div>
+        <div class="input-group">
+            <label>Scheda di appartenenza</label>
+            <select id="workout-plan-select">
+                <!-- Populated dynamically -->
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Giorno della settimana</label>
+            <select id="workout-day">
+                <option value="monday">Lunedì</option>
+                <option value="tuesday">Martedì</option>
+                <option value="wednesday">Mercoledì</option>
+                <option value="thursday">Giovedì</option>
+                <option value="friday">Venerdì</option>
+                <option value="saturday">Sabato</option>
+                <option value="sunday">Domenica</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="createWorkout()">Crea Workout</button>
+    </div>
+</div>
+
+<div class="modal" id="add-exercise-to-workout-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Aggiungi Esercizio</h3>
+            <button class="close-btn" onclick="closeModal('add-exercise-to-workout-modal')">&times;</button>
+        </div>
+        <div class="input-group">
+            <input type="text" id="exercise-search-workout" placeholder="Cerca esercizio..." onkeyup="searchExercisesForWorkout()">
+        </div>
+        <div id="exercise-search-results">
+            <!-- Populated dynamically -->
+        </div>
+        <hr>
+        <h4>O crea nuovo esercizio</h4>
+        <div class="input-group">
+            <label>Nome Esercizio</label>
+            <input type="text" id="new-workout-exercise-name" placeholder="Nome esercizio">
+        </div>
+        <button class="btn btn-secondary" onclick="createNewExerciseForWorkout()">Crea e Aggiungi</button>
+    </div>
+</div>
     <script>
         // Firebase Configuration
         const firebaseConfig = {
@@ -727,6 +851,7 @@
             updateCurrentDate();
             generateCalendar();
             loadTodaySessions();
+            loadExercises();
             
             // Auto-login as anonymous user for demo
             firebase.auth().signInAnonymously()
@@ -761,8 +886,578 @@
                 generateCalendar();
             } else if (pageId === 'profile') {
                 loadProfileData();
+            } else if (pageId === 'workout') {
+                loadWorkoutPlans();
+            } else if (pageId === 'encyclopedia') {
+                loadExercises();
             }
+
+        // Global variables for workout plans
+let workoutPlans = [];
+let currentWorkout = null;
+let exercises = []; // Encyclopedia exercises
+
+// Load data functions
+function loadWorkoutPlans() {
+    if (!currentUser) return;
+    
+    db.collection('workoutPlans')
+        .where('userId', '==', currentUser.uid)
+        .get()
+        .then((snapshot) => {
+            workoutPlans = [];
+            const plansContainer = document.getElementById('workout-plans');
+            
+            if (snapshot.empty) {
+                plansContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <h3>Nessuna scheda creata</h3>
+                        <p>Crea la tua prima scheda di allenamento</p>
+                        <button class="btn btn-primary" onclick="document.getElementById('workout-plan-modal').classList.add('active')">➕ Nuova Scheda</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            let plansHtml = '';
+            snapshot.forEach(doc => {
+                const plan = { id: doc.id, ...doc.data() };
+                workoutPlans.push(plan);
+                
+                plansHtml += `
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">${plan.name}</div>
+                            <button class="btn btn-small btn-secondary" onclick="addWorkoutToplan('${plan.id}')">+ Workout</button>
+                        </div>
+                        <p>${plan.description}</p>
+                        <p><strong>Frequenza:</strong> ${plan.frequency} giorni/settimana</p>
+                        <div id="workouts-${plan.id}"></div>
+                    </div>
+                `;
+            });
+            
+            plansHtml += `
+                <button class="btn btn-primary" onclick="document.getElementById('workout-plan-modal').classList.add('active')" style="width: 100%; margin-top: 20px;">
+                    ➕ Nuova Scheda
+                </button>
+            `;
+            
+            plansContainer.innerHTML = plansHtml;
+            
+            // Load workouts for each plan
+            workoutPlans.forEach(plan => loadWorkoutsForPlan(plan.id));
+        });
+}
+
+function loadWorkoutsForPlan(planId) {
+    db.collection('workouts')
+        .where('userId', '==', currentUser.uid)
+        .where('planId', '==', planId)
+        .get()
+        .then((snapshot) => {
+            const workoutsContainer = document.getElementById(`workouts-${planId}`);
+            
+            if (snapshot.empty) {
+                workoutsContainer.innerHTML = '<p style="color: #888; margin-top: 10px;">Nessun workout creato</p>';
+                return;
+            }
+            
+            let workoutsHtml = '<div style="margin-top: 15px;"><strong>Workouts:</strong></div>';
+            snapshot.forEach(doc => {
+                const workout = doc.data();
+                workoutsHtml += `
+                    <div class="session-item" onclick="startWorkoutSession('${doc.id}')">
+                        <h4>${workout.name}</h4>
+                        <p>Giorno: ${getDayName(workout.day)} | Esercizi: ${workout.exercises ? workout.exercises.length : 0}</p>
+                    </div>
+                `;
+            });
+            
+            workoutsContainer.innerHTML = workoutsHtml;
+        });
+}
+
+function createWorkoutPlan() {
+    const name = document.getElementById('plan-name').value;
+    const description = document.getElementById('plan-description').value;
+    const frequency = parseInt(document.getElementById('plan-frequency').value);
+    
+    if (!name.trim()) {
+        alert('Inserisci il nome della scheda');
+        return;
+    }
+    
+    const planData = {
+        userId: currentUser.uid,
+        name: name,
+        description: description,
+        frequency: frequency,
+        createdAt: new Date()
+    };
+    
+    db.collection('workoutPlans').add(planData)
+        .then(() => {
+            closeModal('workout-plan-modal');
+            loadWorkoutPlans();
+            // Clear form
+            document.getElementById('plan-name').value = '';
+            document.getElementById('plan-description').value = '';
+            document.getElementById('plan-frequency').value = '3';
+        })
+        .catch((error) => console.error('Error creating workout plan:', error));
+}
+
+function addWorkoutToplan(planId) {
+    // Populate plan select
+    const planSelect = document.getElementById('workout-plan-select');
+    planSelect.innerHTML = '';
+    
+    const selectedPlan = workoutPlans.find(p => p.id === planId);
+    if (selectedPlan) {
+        planSelect.innerHTML = `<option value="${planId}" selected>${selectedPlan.name}</option>`;
+    }
+    
+    document.getElementById('workout-session-modal').classList.add('active');
+}
+
+function createWorkout() {
+    const name = document.getElementById('workout-name').value;
+    const planId = document.getElementById('workout-plan-select').value;
+    const day = document.getElementById('workout-day').value;
+    
+    if (!name.trim() || !planId) {
+        alert('Compila tutti i campi richiesti');
+        return;
+    }
+    
+    const workoutData = {
+        userId: currentUser.uid,
+        planId: planId,
+        name: name,
+        day: day,
+        exercises: [],
+        createdAt: new Date()
+    };
+    
+    db.collection('workouts').add(workoutData)
+        .then((docRef) => {
+            currentWorkout = { id: docRef.id, ...workoutData };
+            closeModal('workout-session-modal');
+            loadWorkoutsForPlan(planId);
+            
+            // Clear form
+            document.getElementById('workout-name').value = '';
+            
+            // Open add exercise modal
+            document.getElementById('add-exercise-to-workout-modal').classList.add('active');
+        })
+        .catch((error) => console.error('Error creating workout:', error));
+}
+
+function startWorkoutSession(workoutId) {
+    db.collection('workouts').doc(workoutId).get()
+        .then((doc) => {
+            if (doc.exists) {
+                const workout = doc.data();
+                
+                activeSession = {
+                    id: Date.now().toString(),
+                    name: workout.name,
+                    type: 'strength',
+                    exercises: workout.exercises || [],
+                    startTime: new Date(),
+                    endTime: null,
+                    fromWorkout: true,
+                    workoutId: workoutId
+                };
+                
+                // Convert exercises to session format
+                activeSession.exercises = activeSession.exercises.map(ex => ({
+                    ...ex,
+                    completed: false,
+                    setsCompleted: 0,
+                    actualSets: []
+                }));
+                
+                document.getElementById('active-session-name').textContent = workout.name;
+                document.getElementById('active-session-modal').classList.add('active');
+                updateCurrentExercise();
+            }
+        });
+}
+
+function loadExercises() {
+    if (!currentUser) return;
+    
+    db.collection('exercises')
+        .where('userId', '==', currentUser.uid)
+        .get()
+        .then((snapshot) => {
+            exercises = [];
+            snapshot.forEach(doc => {
+                exercises.push({ id: doc.id, ...doc.data() });
+            });
+            displayExercises(exercises);
+        })
+        .catch(() => {
+            // Load default exercises if none exist
+            exercises = getDefaultExercises();
+            displayExercises(exercises);
+        });
+}
+
+function getDefaultExercises() {
+    return [
+        {
+            name: "Panca Piana",
+            type: "powerlifting",
+            muscles: "Petto (70%), Spalle (20%), Tricipiti (10%)",
+            description: "Esercizio fondamentale per lo sviluppo del petto",
+            executionType: "Rep(+kg)*Serie"
+        },
+        {
+            name: "Squat",
+            type: "powerlifting",
+            muscles: "Quadricipiti (60%), Glutei (30%), Core (10%)",
+            description: "Re degli esercizi per le gambe",
+            executionType: "Rep(+kg)*Serie"
+        },
+        {
+            name: "Trazioni",
+            type: "calisthenics",
+            muscles: "Dorsali (60%), Bicipiti (25%), Romboidi (15%)",
+            description: "Esercizio a corpo libero per la schiena",
+            executionType: "Max Rep"
+        },
+        {
+            name: "Corsa",
+            type: "cardio",
+            muscles: "Gambe (80%), Core (20%)",
+            description: "Attività cardiovascolare base",
+            executionType: "Max Time"
         }
+    ];
+}
+
+function displayExercises(exercisesList) {
+    const container = document.getElementById('exercises-list');
+    
+    if (!exercisesList || exercisesList.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>Nessun esercizio trovato</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let exercisesHtml = '';
+    exercisesList.forEach(exercise => {
+        exercisesHtml += `
+            <div class="exercise-item">
+                <div class="exercise-header">
+                    <div class="exercise-name">${exercise.name}</div>
+                    <div class="exercise-type">${exercise.type}</div>
+                </div>
+                <p><strong>Muscoli:</strong> ${exercise.muscles}</p>
+                <p><strong>Descrizione:</strong> ${exercise.description}</p>
+                <p><strong>Esecuzione:</strong> ${exercise.executionType || 'Rep(+kg)*Serie'}</p>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = exercisesHtml;
+}
+
+function searchExercises() {
+    const query = document.getElementById('exercise-search').value.toLowerCase();
+    const filtered = exercises.filter(ex => 
+        ex.name.toLowerCase().includes(query) || 
+        ex.muscles.toLowerCase().includes(query)
+    );
+    displayExercises(filtered);
+}
+
+function filterExercises() {
+    const filter = document.getElementById('muscle-filter').value.toLowerCase();
+    if (!filter) {
+        displayExercises(exercises);
+        return;
+    }
+    
+    const filtered = exercises.filter(ex => 
+        ex.muscles.toLowerCase().includes(filter)
+    );
+    displayExercises(filtered);
+}
+
+function searchExercisesForWorkout() {
+    const query = document.getElementById('exercise-search-workout').value.toLowerCase();
+    const filtered = exercises.filter(ex => 
+        ex.name.toLowerCase().includes(query)
+    );
+    
+    const container = document.getElementById('exercise-search-results');
+    let resultsHtml = '';
+    
+    filtered.slice(0, 5).forEach(exercise => {
+        resultsHtml += `
+            <div class="exercise-item" onclick="addExerciseToCurrentWorkout('${exercise.id}')">
+                <div class="exercise-header">
+                    <div class="exercise-name">${exercise.name}</div>
+                    <div class="exercise-type">${exercise.type}</div>
+                </div>
+                <p><strong>Muscoli:</strong> ${exercise.muscles}</p>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = resultsHtml;
+}
+
+function createNewExerciseForWorkout() {
+    const name = document.getElementById('new-workout-exercise-name').value;
+    
+    if (!name.trim()) {
+        alert('Inserisci il nome dell\'esercizio');
+        return;
+    }
+    
+    const newExercise = {
+        userId: currentUser.uid,
+        name: name,
+        type: 'strength',
+        muscles: 'Da definire',
+        description: 'Esercizio personalizzato',
+        executionType: 'Rep(+kg)*Serie',
+        createdAt: new Date()
+    };
+    
+    db.collection('exercises').add(newExercise)
+        .then((docRef) => {
+            const exerciseWithId = { id: docRef.id, ...newExercise };
+            exercises.push(exerciseWithId);
+            addExerciseToCurrentWorkout(docRef.id);
+        });
+}
+
+function addExerciseToCurrentWorkout(exerciseId) {
+    if (!currentWorkout) return;
+    
+    const exercise = exercises.find(ex => ex.id === exerciseId);
+    if (!exercise) return;
+    
+    const workoutExercise = {
+        ...exercise,
+        sets: 3,
+        reps: 10,
+        rest: 90
+    };
+    
+    if (!currentWorkout.exercises) {
+        currentWorkout.exercises = [];
+    }
+    currentWorkout.exercises.push(workoutExercise);
+    
+    // Update workout in database
+    db.collection('workouts').doc(currentWorkout.id)
+        .update({ exercises: currentWorkout.exercises })
+        .then(() => {
+            closeModal('add-exercise-to-workout-modal');
+            document.getElementById('new-workout-exercise-name').value = '';
+            document.getElementById('exercise-search-workout').value = '';
+            document.getElementById('exercise-search-results').innerHTML = '';
+        });
+}
+
+function getDayName(day) {
+    const days = {
+        monday: 'Lunedì',
+        tuesday: 'Martedì',
+        wednesday: 'Mercoledì',
+        thursday: 'Giovedì',
+        friday: 'Venerdì',
+        saturday: 'Sabato',
+        sunday: 'Domenica'
+    };
+    return days[day] || day;
+}
+
+function loadTodaySessions() {
+    if (!currentUser) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const container = document.getElementById('today-sessions');
+    
+    db.collection('sessions')
+        .where('userId', '==', currentUser.uid)
+        .where('date', '==', today)
+        .get()
+        .then((snapshot) => {
+            if (snapshot.empty) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🏋️</div>
+                        <h3>Nessuna sessione oggi</h3>
+                        <p>Inizia un nuovo allenamento!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let sessionsHtml = '';
+            snapshot.forEach(doc => {
+                const session = doc.data();
+                const duration = Math.floor(session.totalDuration / 60);
+                
+                sessionsHtml += `
+                    <div class="session-item">
+                        <h4>${session.name}</h4>
+                        <p>Completata alle ${new Date(session.endTime).toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}</p>
+                        <p>Durata: ${duration} min | Esercizi: ${session.exercises.length}</p>
+                        ${session.sessionRPE ? `<p>RPE: ${session.sessionRPE.toFixed(1)}</p>` : ''}
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = sessionsHtml;
+        })
+        .catch((error) => {
+            console.error('Error loading today sessions:', error);
+        });
+}
+
+function loadProfileData() {
+    // Load profile statistics and measurements
+    if (!currentUser) return;
+    
+    // Update statistics
+    db.collection('sessions')
+        .where('userId', '==', currentUser.uid)
+        .get()
+        .then((snapshot) => {
+            const totalSessions = snapshot.size;
+            let totalDuration = 0;
+            const uniqueDates = new Set();
+            let lastWorkout = null;
+            
+            snapshot.forEach(doc => {
+                const session = doc.data();
+                totalDuration += session.totalDuration || 0;
+                uniqueDates.add(session.date);
+                
+                if (!lastWorkout || new Date(session.startTime) > new Date(lastWorkout)) {
+                    lastWorkout = session.startTime;
+                }
+            });
+            
+            const totalHours = Math.floor(totalDuration / 3600);
+            const activeDays = uniqueDates.size;
+            const lastWorkoutDate = lastWorkout ? 
+                new Date(lastWorkout).toLocaleDateString('it-IT') : '-';
+            
+            // Update stat cards
+            document.querySelector('.stat-card:nth-child(1) .stat-value').textContent = totalSessions;
+            document.querySelector('.stat-card:nth-child(2) .stat-value').textContent = activeDays;
+            document.querySelector('.stat-card:nth-child(3) .stat-value').textContent = totalHours + 'h';
+            document.querySelector('.stat-card:nth-child(4) .stat-value').textContent = lastWorkoutDate;
+        });
+}
+
+function saveMeasurements() {
+    const weight = document.getElementById('weight-input').value;
+    const height = document.getElementById('height-input').value;
+    
+    if (!weight && !height) {
+        alert('Inserisci almeno un valore');
+        return;
+    }
+    
+    const measurements = {
+        userId: currentUser.uid,
+        date: new Date().toISOString().split('T')[0],
+        weight: weight ? parseFloat(weight) : null,
+        height: height ? parseFloat(height) : null,
+        timestamp: new Date()
+    };
+    
+    db.collection('measurements').add(measurements)
+        .then(() => {
+            alert('Misurazioni salvate!');
+        })
+        .catch((error) => {
+            console.error('Error saving measurements:', error);
+        });
+}
+
+function saveNotes() {
+    const notes = document.getElementById('notes').value;
+    
+    if (!notes.trim()) {
+        alert('Inserisci delle note');
+        return;
+    }
+    
+    const noteData = {
+        userId: currentUser.uid,
+        content: notes,
+        date: new Date().toISOString().split('T')[0],
+        timestamp: new Date()
+    };
+    
+    db.collection('notes').add(noteData)
+        .then(() => {
+            alert('Note salvate!');
+        })
+        .catch((error) => {
+            console.error('Error saving notes:', error);
+        });
+}
+
+function showAddOptions() {
+    const options = `
+        <div style="position: fixed; bottom: 90px; right: 20px; z-index: 1000;">
+            <button class="btn btn-primary" onclick="startNewSession()" style="display: block; margin-bottom: 10px; white-space: nowrap;">
+                🏋️ Nuova Sessione
+            </button>
+            <button class="btn btn-primary" onclick="createTest()" style="display: block; margin-bottom: 10px; white-space: nowrap;">
+                🧪 Crea Test
+            </button>
+            <button class="btn btn-primary" onclick="addBodyMeasurements()" style="display: block; white-space: nowrap;">
+                📏 Misurazioni
+            </button>
+        </div>
+    `;
+    
+    // Remove existing options
+    const existing = document.querySelector('[data-add-options]');
+    if (existing) {
+        existing.remove();
+        return;
+    }
+    
+    const optionsDiv = document.createElement('div');
+    optionsDiv.innerHTML = options;
+    optionsDiv.setAttribute('data-add-options', 'true');
+    document.body.appendChild(optionsDiv);
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        if (document.querySelector('[data-add-options]')) {
+            document.querySelector('[data-add-options]').remove();
+        }
+    }, 5000);
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.remove('active');
+}
+
+function updateCalendarData() {
+    loadCalendarWorkouts();
+}
 
         function updateCurrentDate() {
             const options = { 
@@ -824,6 +1519,8 @@
             const sets = parseInt(document.getElementById('exercise-sets').value);
             const reps = parseInt(document.getElementById('exercise-reps').value);
             const rest = parseInt(document.getElementById('exercise-rest').value);
+            const executionType = document.getElementById('new-exercise-execution').value;
+
 
             if (!name.trim()) {
                 alert('Inserisci il nome dell\'esercizio');
@@ -834,6 +1531,7 @@
                 id: Date.now().toString(),
                 name: name,
                 type: type,
+                executionType: executionType,
                 muscles: muscles,
                 sets: sets,
                 reps: reps,
@@ -1545,34 +2243,3 @@
                     console.error('Error getting session details:', error);
                 });
         }
-
-        function displaySessionDetails(session) {
-            const modal = document.createElement('div');
-            modal.className = 'modal active';
-            
-            let exercisesHtml = '';
-            if (session.exercises) {
-                session.exercises.forEach(exercise => {
-                    exercisesHtml += `
-                        <div class="exercise-item">
-                            <div class="exercise-header">
-                                <div class="exercise-name">${exercise.name}</div>
-                                <div class="exercise-type">${exercise.type}</div>
-                            </div>
-                            <p><strong>Serie completate:</strong> ${exercise.setsCompleted}/${exercise.sets}</p>
-                            ${exercise.averageRPE ? `<p><strong>RPE medio:</strong> ${exercise.averageRPE.toFixed(1)}</p>` : ''}
-                            ${exercise.notes ? `<p><strong>Note:</strong> ${exercise.notes}</p>` : ''}
-                        </div>
-                    `;
-                });
-            }
-
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>${session.name}</h3>
-                        <button class="close-btn" onclick="this.parentElement.parentElement.parentElement.remove()">&times;</button>
-                    </div>
-                    <div class="card">
-                        <p><strong>Data:</strong> ${new Date(session.startTime).toLocaleDateString('it-IT')}</p>
-                        <p><strong>Durata:</strong> ${Math.floor(session.totalDuration / 60)} minuti</p>
