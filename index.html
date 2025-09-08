@@ -841,6 +841,13 @@
         let currentDate = new Date();
         let timerInterval = null;
         let timerSeconds = 0;
+        // Global variables for workout plans
+        let workoutPlans = [];
+        let currentWorkout = null;
+        let exercises = []; // Encyclopedia exercises
+        
+
+// Load data functions        
 function updateCurrentDate() {
             const options = { 
                 weekday: 'long', 
@@ -852,12 +859,7 @@ function updateCurrentDate() {
                 new Date().toLocaleDateString('it-IT', options);
         }
 
-        // Global variables for workout plans
-let workoutPlans = [];
-let currentWorkout = null;
-let exercises = []; // Encyclopedia exercises
 
-// Load data functions
 function loadWorkoutPlans() {
     if (!currentUser) return;
     
