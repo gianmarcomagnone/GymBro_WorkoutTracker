@@ -2243,3 +2243,46 @@ function updateCalendarData() {
                     console.error('Error getting session details:', error);
                 });
         }
+function displaySessionDetails(session) {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    
+    let exercisesHtml = '';
+    if (session.exercises && session.exercises.length > 0) {
+        session.exercises.forEach(exercise => {
+            exercisesHtml += `
+                <div class="workout-exercise">
+                    <h5>${exercise.name}</h5>
+                    <p>Serie: ${exercise.setsCompleted}/${exercise.sets}</p>
+                    ${exercise.averageRPE ? `<p>RPE medio: ${exercise.averageRPE.toFixed(1)}</p>` : ''}
+                </div>
+            `;
+        });
+    }
+    
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Dettagli Sessione</h3>
+                <button class="close-btn" onclick="this.parentElement.parentElement.parentElement.remove()">&times;</button>
+            </div>
+            <div class="card">
+                <h4>${session.name}</h4>
+                <p><strong>Tipo:</strong> ${session.type}</p>
+                <p><strong>Data:</strong> ${new Date(session.startTime).toLocaleDateString('it-IT')}</p>
+                <p><strong>Durata:</strong> ${Math.floor(session.totalDuration / 60)} minuti</p>
+                ${session.sessionRPE ? `<p><strong>RPE Sessione:</strong> ${session.sessionRPE.toFixed(1)}</p>` : ''}
+                <div style="margin-top: 15px;">
+                    <strong>Esercizi:</strong>
+                    ${exercisesHtml}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+}
+    </script>
+</body>
+</html>
