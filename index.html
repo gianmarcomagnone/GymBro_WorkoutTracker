@@ -841,12 +841,7 @@
         let currentDate = new Date();
         let timerInterval = null;
         let timerSeconds = 0;
-
-        // Initialize app
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeApp();
-        });
-        function updateCurrentDate() {
+function updateCurrentDate() {
             const options = { 
                 weekday: 'long', 
                 year: 'numeric', 
@@ -856,52 +851,7 @@
             document.getElementById('current-date').textContent = 
                 new Date().toLocaleDateString('it-IT', options);
         }
-        
-        function initializeApp() {
-            updateCurrentDate();
-            generateCalendar();
-            loadTodaySessions();
-            loadExercises();
-            
-            // Auto-login as anonymous user for demo
-            firebase.auth().signInAnonymously()
-                .then((result) => {
-                    currentUser = result.user;
-                    console.log('Signed in anonymously');
-                })
-                .catch((error) => {
-                    console.error('Anonymous auth error:', error);
-                });
-        }
 
-        function showPage(pageId) {
-            // Hide all pages
-            document.querySelectorAll('.page').forEach(page => {
-                page.classList.remove('active');
-            });
-            
-            // Remove active class from all tabs
-            document.querySelectorAll('.nav-tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            // Show selected page
-            document.getElementById(pageId).classList.add('active');
-            
-            // Add active class to selected tab
-            event.target.classList.add('active');
-
-            // Load page specific content
-            if (pageId === 'calendar') {
-                generateCalendar();
-            } else if (pageId === 'profile') {
-                loadProfileData();
-            } else if (pageId === 'workout') {
-                loadWorkoutPlans();
-            } else if (pageId === 'encyclopedia') {
-                loadExercises();
-            }
-        }
         // Global variables for workout plans
 let workoutPlans = [];
 let currentWorkout = null;
@@ -2284,6 +2234,57 @@ function displaySessionDetails(session) {
     document.body.appendChild(modal);
 }
 }
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+        
+        function initializeApp() {
+            updateCurrentDate();
+            generateCalendar();
+            loadTodaySessions();
+            loadExercises();
+            
+            // Auto-login as anonymous user for demo
+            firebase.auth().signInAnonymously()
+                .then((result) => {
+                    currentUser = result.user;
+                    console.log('Signed in anonymously');
+                })
+                .catch((error) => {
+                    console.error('Anonymous auth error:', error);
+                });
+        }
+                
+
+        function showPage(pageId) {
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected page
+            document.getElementById(pageId).classList.add('active');
+            
+            // Add active class to selected tab
+            event.target.classList.add('active');
+
+            // Load page specific content
+            if (pageId === 'calendar') {
+                generateCalendar();
+            } else if (pageId === 'profile') {
+                loadProfileData();
+            } else if (pageId === 'workout') {
+                loadWorkoutPlans();
+            } else if (pageId === 'encyclopedia') {
+                loadExercises();
+            }
+        }
     </script>
 </body>
 </html>
