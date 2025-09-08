@@ -846,7 +846,17 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeApp();
         });
-
+        function updateCurrentDate() {
+            const options = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            };
+            document.getElementById('current-date').textContent = 
+                new Date().toLocaleDateString('it-IT', options);
+        }
+        
         function initializeApp() {
             updateCurrentDate();
             generateCalendar();
@@ -891,7 +901,7 @@
             } else if (pageId === 'encyclopedia') {
                 loadExercises();
             }
-
+        }
         // Global variables for workout plans
 let workoutPlans = [];
 let currentWorkout = null;
@@ -1459,16 +1469,7 @@ function updateCalendarData() {
     loadCalendarWorkouts();
 }
 
-        function updateCurrentDate() {
-            const options = { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-            };
-            document.getElementById('current-date').textContent = 
-                new Date().toLocaleDateString('it-IT', options);
-        }
+        
 
         function startNewSession() {
             document.getElementById('session-modal').classList.add('active');
