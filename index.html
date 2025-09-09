@@ -852,7 +852,7 @@
 			let workoutPlans = [];
 			let currentWorkout = null;
 			let exercises = []; // Encyclopedia exercises
-			
+			let exerciseModalContext = 'session'; // 'session' o 'encyclopedia'
 			
 			// Load data functions        
 			function updateCurrentDate() {
@@ -1609,10 +1609,64 @@
 			}
 			
 			function showAddExerciseOptions() {
+			    exerciseModalContext = 'session'; // Imposta il contesto per sessione
+			    
+			    // Aggiorna il contenuto del modal per la sessione
+			    const modal = document.getElementById('exercise-modal');
+			    const button = modal.querySelector('button');
+			    if (button) {
+			        button.textContent = 'Aggiungi alla Sessione';
+			        button.setAttribute('onclick', 'addExerciseToSession()');
+			    }
+			    
 			    document.getElementById('exercise-modal').classList.add('active');
 			}
+			function saveExerciseToEncyclopedia() {
+				const name = document.getElementById('new-exercise-name').value;
+				const type = document.getElementById('new-exercise-type').value;
+				const muscles = document.getElementById('new-exercise-muscles').value;
+				const executionType = document.getElementById('new-exercise-execution').value;
 			
+				if (!name.trim()) {
+					alert('Inserisci il nome dell\'esercizio');
+					return;
+				}
+				
+				if (!currentUser || currentUser.isAnonymous) {
+					alert('Devi effettuare il login per salvare esercizi nell\'enciclopedia');
+					return;
+				}
+			
+				const exerciseData = {
+					userId: currentUser.uid,
+					name: name,
+					type: type,
+					muscles: muscles || 'Da definire',
+					description: 'Esercizio personalizzato',
+					executionType: executionType,
+					createdAt: new Date()
+				};
+			
+				db.collection('exercises').add(exerciseData)
+					.then(() => {
+						closeModal('exercise-modal');
+						loadExercises(); // Ricarica l'enciclopedia
+						
+						// Clear form
+						document.getElementById('new-exercise-name').value = '';
+						document.getElementById('new-exercise-muscles').value = '';
+					})
+					.catch((error) => {
+						console.error('Error saving exercise:', error);
+						alert('Errore nel salvare l\'esercizio');
+					});
+			}
+
 			function addExerciseToSession() {
+				if (!activeSession) {
+			        alert('Nessuna sessione attiva. Crea prima una sessione.');
+			        return;
+			    }
 			    const name = document.getElementById('new-exercise-name').value;
 			    const type = document.getElementById('new-exercise-type').value;
 			    const muscles = document.getElementById('new-exercise-muscles').value;
@@ -1667,7 +1721,18 @@
 			}
 			
 			function createNewExercise() {
-			    document.getElementById('exercise-modal').classList.add('active');
+			    exerciseModalContext = 'encyclopedia'; // Imposta il contesto
+			    
+			    // Aggiorna il contenuto del modal per l'enciclopedia
+			    const modal = document.getElementById('exercise-modal');
+			    const button = modal.querySelector('button[onclick="addExerciseToSession()"]');
+			    if (button) {
+			        button.textContent = 'Salva nell\'Enciclopedia';
+			        button.setAttribute('onclick', 'saveExerciseToEncyclopedia()');
+			    }
+			    
+			    modal.classList.add('active');
+			    
 			    // Clear form
 			    document.getElementById('new-exercise-name').value = '';
 			    document.getElementById('new-exercise-muscles').value = '';
