@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="google-signin-client_id" content="TUO_GOOGLE_CLIENT_ID.apps.googleusercontent.com">
+    <meta name="google-signin-client_id" content="276297700160-bib2rufq27lcmmru8lbqsqbbsjpc7m9k.apps.googleusercontent.com">
     <title>GymBro - WorkoutTracker</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -469,11 +469,26 @@
     margin-right: 10px;
 }
 
+#login-modal .modal-content {
+    max-width: 350px;
+}
+
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+    animation: spin 1s linear infinite;
+}
+
 @media (max-width: 480px) {
     #login-modal .modal-content {
         margin: 20px;
         max-width: none;
     }
+}
 }
     </style>
 </head>
