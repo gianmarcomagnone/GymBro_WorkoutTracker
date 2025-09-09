@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-signin-client_id" content="TUO_GOOGLE_CLIENT_ID.apps.googleusercontent.com">
     <title>GymBro - WorkoutTracker</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -457,6 +458,23 @@
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
 }
+        #login-modal .modal-content {
+    max-width: 350px;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    margin-right: 10px;
+}
+
+@media (max-width: 480px) {
+    #login-modal .modal-content {
+        margin: 20px;
+        max-width: none;
+    }
+}
     </style>
 </head>
 <body>
@@ -630,7 +648,13 @@
                     </div>
                     <button class="btn btn-primary" onclick="saveMeasurements()">Salva Misurazioni</button>
                 </div>
-
+                <div class="card" id="user-info-card" style="display: none;">
+                    <div class="card-title">Account</div>
+                    <div id="user-info"></div>
+                    <button class="btn btn-secondary" onclick="signOut()" style="width: 100%; margin-top: 15px;">
+                        🚪 Disconnetti
+                    </button>
+                </div>
                 <div class="card">
                     <div class="card-title">Note</div>
                     <div class="input-group">
@@ -819,6 +843,22 @@
         <button class="btn btn-secondary" onclick="createNewExerciseForWorkout()">Crea e Aggiungi</button>
     </div>
 </div>
+<!-- LOGIN MODAL -->
+<div class="modal active" id="login-modal" style="z-index: 2000;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>🏋️ Accedi a GymBro</h3>
+        </div>
+        <div style="text-align: center; padding: 20px;">
+            <p style="color: #ccc; margin-bottom: 30px;">Accedi con il tuo account Google per salvare i tuoi allenamenti</p>
+            <button class="btn btn-primary" onclick="signInWithGoogle()" style="width: 100%; padding: 15px;">
+                <span style="margin-right: 10px;">🔐</span>
+                Accedi con Google
+            </button>
+        </div>
+    </div>
+</div>
+    
     <script>
         // Firebase Configuration
         const firebaseConfig = {
@@ -834,6 +874,7 @@
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const auth = firebase.auth();
 
         // Global variables
         let currentUser = null;
@@ -861,7 +902,7 @@ function updateCurrentDate() {
 
 
 function loadWorkoutPlans() {
-    if (!currentUser) return;
+    if (!currentUser || currentUser.isAnonymous) {      alert('Devi effettuare il login per utilizzare questa funzione');      return;  }
     
     db.collection('workoutPlans')
         .where('userId', '==', currentUser.uid)
@@ -1051,7 +1092,7 @@ function startWorkoutSession(workoutId) {
 }
 
 function loadExercises() {
-    if (!currentUser) return;
+    if (!currentUser || currentUser.isAnonymous) {      alert('Devi effettuare il login per utilizzare questa funzione');      return;  }
     
     db.collection('exercises')
         .where('userId', '==', currentUser.uid)
@@ -1248,7 +1289,7 @@ function getDayName(day) {
 }
 
 function loadTodaySessions() {
-    if (!currentUser) return;
+    if (!currentUser || currentUser.isAnonymous) {      alert('Devi effettuare il login per utilizzare questa funzione');      return;  }
     
     const today = new Date().toISOString().split('T')[0];
     const container = document.getElementById('today-sessions');
@@ -1293,8 +1334,24 @@ function loadTodaySessions() {
 
 function loadProfileData() {
     // Load profile statistics and measurements
-    if (!currentUser) return;
+    if (!currentUser || currentUser.isAnonymous) {      alert('Devi effettuare il login per utilizzare questa funzione');      return;  }
+    // Mostra informazioni utente
+    const userInfoCard = document.getElementById('user-info-card');
+    const userInfo = document.getElementById('user-info');
     
+    if (userInfoCard && userInfo) {
+        userInfoCard.style.display = 'block';
+        userInfo.innerHTML = `
+            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                <img src="${currentUser.photoURL || '/placeholder-avatar.png'}" 
+                     alt="Avatar" style="width: 50px; height: 50px; border-radius: 25px; margin-right: 15px;">
+                <div>
+                    <p style="margin: 0; font-weight: 600;">${currentUser.displayName || 'Utente'}</p>
+                    <p style="margin: 0; color: #888; font-size: 14px;">${currentUser.email}</p>
+                </div>
+            </div>
+        `;
+    }
     // Update statistics
     db.collection('sessions')
         .where('userId', '==', currentUser.uid)
@@ -1867,7 +1924,7 @@ function updateCalendarData() {
         }
 
         function saveBodyMeasurements() {
-            if (!currentUser) return;
+            if (!currentUser || currentUser.isAnonymous) {      alert('Devi effettuare il login per utilizzare questa funzione');      return;  }
 
             const measurements = {
                 userId: currentUser.uid,
@@ -2094,7 +2151,7 @@ function updateCalendarData() {
         }
 
         function loadCalendarWorkouts() {
-            if (!currentUser) return;
+            if (!currentUser || currentUser.isAnonymous) {      alert('Devi effettuare il login per utilizzare questa funzione');      return;  }
 
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
@@ -2240,22 +2297,85 @@ function displaySessionDetails(session) {
         document.addEventListener('DOMContentLoaded', function() {
             initializeApp();
         });
+
+function signInWithGoogle() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.addScope('profile');
+    provider.addScope('email');
+    
+    auth.signInWithPopup(provider)
+        .then((result) => {
+            // This gives you a Google Access Token.
+            const token = result.credential.accessToken;
+            // The signed-in user info.
+            const user = result.user;
+            console.log('Google sign-in successful:', user.displayName);
+        })
+        .catch((error) => {
+            console.error('Google sign-in error:', error);
+            alert('Errore durante il login con Google. Riprova.');
+        });
+}
+
+function signOut() {
+    auth.signOut().then(() => {
+        console.log('User signed out');
+    }).catch((error) => {
+        console.error('Sign-out error:', error);
+    });
+}
+
+function loadUserData() {
+    loadTodaySessions();
+    loadExercises();
+    loadWorkoutPlans();
+    loadProfileData();
+}
+
+function loadDemoData() {
+    // Carica dati di esempio senza connessione al database
+    const container = document.getElementById('today-sessions');
+    container.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-state-icon">🔐</div>
+            <h3>Accedi per vedere i tuoi allenamenti</h3>
+            <p>I tuoi dati verranno sincronizzati tra tutti i dispositivi</p>
+        </div>
+    `;
+    
+    // Carica esercizi di default
+    exercises = getDefaultExercises();
+    displayExercises(exercises);
+}
         
         function initializeApp() {
             updateCurrentDate();
             generateCalendar();
-            loadTodaySessions();
-            loadExercises();
             
-            // Auto-login as anonymous user for demo
-            firebase.auth().signInAnonymously()
-                .then((result) => {
-                    currentUser = result.user;
-                    console.log('Signed in anonymously');
-                })
-                .catch((error) => {
-                    console.error('Anonymous auth error:', error);
-                });
+            // Listener per lo stato di autenticazione
+            auth.onAuthStateChanged((user) => {
+                if (user && !user.isAnonymous) {
+                    // User is signed in with Google
+                    currentUser = user;
+                    console.log('User signed in:', user.displayName);
+                    
+                    // Nascondi il modal di login
+                    document.getElementById('login-modal').classList.remove('active');
+                    
+                    // Carica i dati dell'utente
+                    loadUserData();
+                } else {
+                    // User is signed out
+                    currentUser = null;
+                    console.log('User signed out');
+                    
+                    // Mostra il modal di login
+                    document.getElementById('login-modal').classList.add('active');
+                    
+                    // Carica dati di demo senza user
+                    loadDemoData();
+                }
+            });
         }
                 
 
