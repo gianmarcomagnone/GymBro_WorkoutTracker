@@ -393,17 +393,11 @@
 			from { transform: translateY(20px); opacity: 0; }
 			to { transform: translateY(0); opacity: 1; }
 			}
-			#login-modal .modal-content {
-			max-width: 350px;
-			}
 			.user-avatar {
 			width: 40px;
 			height: 40px;
 			border-radius: 20px;
 			margin-right: 10px;
-			}
-			#login-modal .modal-content {
-			max-width: 350px;
 			}
 			#login-modal.checking-auth {
 			display: flex !important;
@@ -795,36 +789,37 @@
 					</button>
 				</div>
 			</div>
-			<div class="modal" id="edit-exercise-modal">
-				<div class="modal-content">
-					<div class="modal-header">
-						<h3>Modifica Esercizio</h3>
-						<button class="close-btn" onclick="closeModal('edit-exercise-modal')">&times;</button>
-					</div>
-					<div class="input-group">
-						<label>Nome Esercizio</label>
-						<input type="text" id="edit-exercise-name" placeholder="Nome esercizio">
-					</div>
-					<div class="input-group">
-						<label>Tipo</label>
-						<select id="edit-exercise-type">
-							<option value="powerlifting">Powerlifting</option>
-							<option value="calisthenics">Calisthenics</option>
-							<option value="cardio">Cardio</option>
-							<option value="hiit">HIIT</option>
-							<option value="isolation">Isolamento</option>
-						</select>
-					</div>
-					<div class="input-group">
-						<label>Muscoli coinvolti</label>
-						<input type="text" id="edit-exercise-muscles" placeholder="es. Petto, Spalle, Tricipiti">
-					</div>
-					<div class="input-group">
-						<label>Descrizione</label>
-						<textarea id="edit-exercise-description" rows="3"></textarea>
-					</div>
-					<button class="btn btn-primary" onclick="saveExerciseChanges()">Salva Modifiche</button>
+		</div>
+		<!-- EDIT EXERCISE MODAL (separato) -->
+		<div class="modal" id="edit-exercise-modal">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h3>Modifica Esercizio</h3>
+					<button class="close-btn" onclick="closeModal('edit-exercise-modal')">&times;</button>
 				</div>
+				<div class="input-group">
+					<label>Nome Esercizio</label>
+					<input type="text" id="edit-exercise-name" placeholder="Nome esercizio">
+				</div>
+				<div class="input-group">
+					<label>Tipo</label>
+					<select id="edit-exercise-type">
+						<option value="powerlifting">Powerlifting</option>
+						<option value="calisthenics">Calisthenics</option>
+						<option value="cardio">Cardio</option>
+						<option value="hiit">HIIT</option>
+						<option value="isolation">Isolamento</option>
+					</select>
+				</div>
+				<div class="input-group">
+					<label>Muscoli coinvolti</label>
+					<input type="text" id="edit-exercise-muscles" placeholder="es. Petto, Spalle, Tricipiti">
+				</div>
+				<div class="input-group">
+					<label>Descrizione</label>
+					<textarea id="edit-exercise-description" rows="3"></textarea>
+				</div>
+				<button class="btn btn-primary" onclick="saveExerciseChanges()">Salva Modifiche</button>
 			</div>
 		</div>
 		<script>
@@ -1110,12 +1105,23 @@
 			    
 			    currentEditingExercise = exercise;
 			    
-			    document.getElementById('edit-exercise-name').value = exercise.name;
-			    document.getElementById('edit-exercise-type').value = exercise.type;
-			    document.getElementById('edit-exercise-muscles').value = exercise.muscles;
-			    document.getElementById('edit-exercise-description').value = exercise.description || '';
-			    
-			    document.getElementById('edit-exercise-modal').classList.add('active');
+			    const nameInput = document.getElementById('edit-exercise-name');
+				const typeInput = document.getElementById('edit-exercise-type');
+				const musclesInput = document.getElementById('edit-exercise-muscles');
+				const descriptionInput = document.getElementById('edit-exercise-description');
+				
+				if (!nameInput || !typeInput || !musclesInput || !descriptionInput) {
+					console.error('Modal elements not found');
+					return;
+				}
+				
+				nameInput.value = exercise.name;
+				typeInput.value = exercise.type;
+				musclesInput.value = exercise.muscles;
+				descriptionInput.value = exercise.description || '';
+				
+				document.getElementById('edit-exercise-modal').classList.add('active');
+
 			}
 			
 			function saveExerciseChanges() {
@@ -1552,7 +1558,10 @@
 			}
 			
 			function closeModal(modalId) {
-			document.getElementById(modalId).classList.remove('active');
+			    const modal = document.getElementById(modalId);
+			    if (modal) {
+			        modal.classList.remove('active');
+			    }
 			}
 			
 			function updateCalendarData() {
