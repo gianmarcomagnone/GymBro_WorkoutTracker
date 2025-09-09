@@ -1063,69 +1063,99 @@
 			}
 			
 			function loadExercises() {
-			if (!currentUser || currentUser.isAnonymous) {      console.log('Devi effettuare il login per utilizzare questa funzione');      return;  }
-			
-			db.collection('exercises')
-			.where('userId', '==', currentUser.uid)
-			.get()
-			.then((snapshot) => {
-			    exercises = [];
-			    snapshot.forEach(doc => {
-			        exercises.push({ id: doc.id, ...doc.data() });
-			    });
-			    displayExercises(exercises);
-			})
-			.catch(() => {
-			    // Load default exercises if none exist
-			    exercises = getDefaultExercises();
-			    displayExercises(exercises);
-			});
+			    if (!currentUser || currentUser.isAnonymous) {
+			        // Load default exercises for non-logged users
+			        exercises = getDefaultExercises();
+			        displayExercises(exercises);
+			        return;
+			    }
+			    
+			    db.collection('exercises')
+			        .where('userId', '==', currentUser.uid)
+			        .get()
+			        .then((snapshot) => {
+			            exercises = [];
+			            snapshot.forEach(doc => {
+			                exercises.push({ id: doc.id, ...doc.data() });
+			            });
+			            
+			            // Se non ci sono esercizi personalizzati, aggiungi quelli di default
+			            if (exercises.length === 0) {
+			                exercises = getDefaultExercises();
+			            }
+			            
+			            displayExercises(exercises);
+			        })
+			        .catch((error) => {
+			            console.error('Error loading exercises:', error);
+			            exercises = getDefaultExercises();
+			            displayExercises(exercises);
+			        });
 			}
+			
 			let currentEditingExercise = null;
 			
 			function editExercise(exerciseId) {
-			const exercise = exercises.find(ex => ex.id === exerciseId || ex.name === exerciseId);
-			if (!exercise) return;
-			
-			currentEditingExercise = exercise;
-			
-			document.getElementById('edit-exercise-name').value = exercise.name;
-			document.getElementById('edit-exercise-type').value = exercise.type;
-			document.getElementById('edit-exercise-muscles').value = exercise.muscles;
-			document.getElementById('edit-exercise-description').value = exercise.description || '';
-			
-			if (nameInput) nameInput.value = exercise.name;
-			if (typeInput) typeInput.value = exercise.type;
-			if (musclesInput) musclesInput.value = exercise.muscles;
-			if (descriptionInput) descriptionInput.value = exercise.description || '';
-			
-			document.getElementById('edit-exercise-modal').classList.add('active');
+			    let exercise;
+			    
+			    // Prima cerca per ID (esercizi del database)
+			    exercise = exercises.find(ex => ex.id === exerciseId);
+			    
+			    // Se non trovato, cerca per nome (esercizi di default)
+			    if (!exercise) {
+			        exercise = exercises.find(ex => ex.name === exerciseId && !ex.id);
+			    }
+			    
+			    if (!exercise) return;
+			    
+			    currentEditingExercise = exercise;
+			    
+			    document.getElementById('edit-exercise-name').value = exercise.name;
+			    document.getElementById('edit-exercise-type').value = exercise.type;
+			    document.getElementById('edit-exercise-muscles').value = exercise.muscles;
+			    document.getElementById('edit-exercise-description').value = exercise.description || '';
+			    
+			    document.getElementById('edit-exercise-modal').classList.add('active');
 			}
 			
 			function saveExerciseChanges() {
-			if (!currentEditingExercise) return;
-			
-			const updatedData = {
-			name: document.getElementById('edit-exercise-name').value,
-			type: document.getElementById('edit-exercise-type').value,
-			muscles: document.getElementById('edit-exercise-muscles').value,
-			description: document.getElementById('edit-exercise-description').value
-			};
-			
-			if (currentEditingExercise.id) {
-			// Update in database
-			db.collection('exercises').doc(currentEditingExercise.id)
-			    .update(updatedData)
-			    .then(() => {
+			    if (!currentEditingExercise) return;
+			    
+			    const updatedData = {
+			        name: document.getElementById('edit-exercise-name').value,
+			        type: document.getElementById('edit-exercise-type').value,
+			        muscles: document.getElementById('edit-exercise-muscles').value,
+			        description: document.getElementById('edit-exercise-description').value
+			    };
+			    
+			    if (currentEditingExercise.id) {
+			        // Aggiorna esercizio esistente nel database
+			        db.collection('exercises').doc(currentEditingExercise.id)
+			            .update(updatedData)
+			            .then(() => {
+			                closeModal('edit-exercise-modal');
+			                loadExercises();
+			            });
+			    } else if (currentUser && !currentUser.isAnonymous) {
+			        // Crea nuovo esercizio nel database (era un esercizio di default)
+			        const newExerciseData = {
+			            ...updatedData,
+			            userId: currentUser.uid,
+			            executionType: currentEditingExercise.executionType || 'Rep(+kg)*Serie',
+			            createdAt: new Date()
+			        };
+			        
+			        db.collection('exercises').add(newExerciseData)
+			            .then(() => {
+			                closeModal('edit-exercise-modal');
+			                loadExercises();
+			            });
+			    } else {
+			        // Aggiorna solo localmente per esercizi di default (utente non loggato)
+			        Object.assign(currentEditingExercise, updatedData);
+			        displayExercises(exercises);
 			        closeModal('edit-exercise-modal');
-			        loadExercises();
-			    });
-			} else {
-			// Update local array for default exercises
-			Object.assign(currentEditingExercise, updatedData);
-			displayExercises(exercises);
-			closeModal('edit-exercise-modal');
-			}
+			    }
 			}
 			
 			function deleteExercise(exerciseId) {
@@ -1173,41 +1203,46 @@
 			}
 			
 			function displayExercises(exercisesList) {
-			const container = document.getElementById('exercises-list');
-			
-			if (!exercisesList || exercisesList.length === 0) {
-			container.innerHTML = `
-			    <div class="empty-state">
-			        <p>Nessun esercizio trovato</p>
-			    </div>
-			`;
-			return;
-			}
-			
-			let exercisesHtml = '';
-			exercisesList.forEach(exercise => {
-			exercisesHtml += `
-			    <div class="exercise-item">
-			        <div class="exercise-header">
-			            <div class="exercise-name">${exercise.name}</div>
-			            <div class="exercise-type">${exercise.type}</div>
-			        </div>
-			        <p><strong>Muscoli:</strong> ${exercise.muscles}</p>
-			        <p><strong>Descrizione:</strong> ${exercise.description}</p>
-			        <p><strong>Esecuzione:</strong> ${exercise.executionType || 'Rep(+kg)*Serie'}</p>
-			        <div style="margin-top: 10px;">
-			            <button class="btn btn-small btn-secondary" onclick="editExercise('${exercise.id || exercise.name}')">
-			                ✏️ Modifica
-			            </button>
-			            <button class="btn btn-small btn-secondary" onclick="deleteExercise('${exercise.id}')" style="background: #f44336;">
-			                🗑️ Elimina
-			            </button>
-			        </div>
-			    </div>
-			`;
-			});
-			
-			container.innerHTML = exercisesHtml;
+			    const container = document.getElementById('exercises-list');
+			    
+			    if (!exercisesList || exercisesList.length === 0) {
+			        container.innerHTML = `
+			            <div class="empty-state">
+			                <p>Nessun esercizio trovato</p>
+			            </div>
+			        `;
+			        return;
+			    }
+			    
+			    let exercisesHtml = '';
+			    exercisesList.forEach(exercise => {
+			        const isDefaultExercise = !exercise.id;
+			        const canDelete = exercise.id && currentUser && !currentUser.isAnonymous;
+			        
+			        exercisesHtml += `
+			            <div class="exercise-item">
+			                <div class="exercise-header">
+			                    <div class="exercise-name">${exercise.name}</div>
+			                    <div class="exercise-type">${exercise.type}</div>
+			                </div>
+			                <p><strong>Muscoli:</strong> ${exercise.muscles}</p>
+			                <p><strong>Descrizione:</strong> ${exercise.description}</p>
+			                <p><strong>Esecuzione:</strong> ${exercise.executionType || 'Rep(+kg)*Serie'}</p>
+			                <div style="margin-top: 10px;">
+			                    <button class="btn btn-small btn-secondary" onclick="editExercise('${exercise.id || exercise.name}')">
+			                        ✏️ Modifica
+			                    </button>
+			                    ${canDelete ? `
+			                        <button class="btn btn-small btn-secondary" onclick="deleteExercise('${exercise.id}')" style="background: #f44336;">
+			                            🗑️ Elimina
+			                        </button>
+			                    ` : ''}
+			                </div>
+			            </div>
+			        `;
+			    });
+			    
+			    container.innerHTML = exercisesHtml;
 			}
 			
 			function searchExercises() {
@@ -1283,32 +1318,42 @@
 			}
 			
 			function addExerciseToCurrentWorkout(exerciseId) {
-			if (!currentWorkout) return;
-			
-			const exercise = exercises.find(ex => ex.id === exerciseId);
-			if (!exercise) return;
-			
-			const workoutExercise = {
-			...exercise,
-			sets: 3,
-			reps: 10,
-			rest: 90
-			};
-			
-			if (!currentWorkout.exercises) {
-			currentWorkout.exercises = [];
-			}
-			currentWorkout.exercises.push(workoutExercise);
-			
-			// Update workout in database
-			db.collection('workouts').doc(currentWorkout.id)
-			.update({ exercises: currentWorkout.exercises })
-			.then(() => {
-			    closeModal('add-exercise-to-workout-modal');
-			    document.getElementById('new-workout-exercise-name').value = '';
-			    document.getElementById('exercise-search-workout').value = '';
-			    document.getElementById('exercise-search-results').innerHTML = '';
-			});
+			    if (!currentWorkout) {
+			        console.error('currentWorkout is not defined');
+			        return;
+			    }
+			    
+			    const exercise = exercises.find(ex => ex.id === exerciseId || ex.name === exerciseId);
+			    if (!exercise) {
+			        console.error('Exercise not found');
+			        return;
+			    }
+			    
+			    const workoutExercise = {
+			        ...exercise,
+			        sets: 3,
+			        reps: 10,
+			        rest: 90
+			    };
+			    
+			    if (!currentWorkout.exercises) {
+			        currentWorkout.exercises = [];
+			    }
+			    currentWorkout.exercises.push(workoutExercise);
+			    
+			    // Update workout in database
+			    db.collection('workouts').doc(currentWorkout.id)
+			        .update({ exercises: currentWorkout.exercises })
+			        .then(() => {
+			            closeModal('add-exercise-to-workout-modal');
+			            document.getElementById('new-workout-exercise-name').value = '';
+			            document.getElementById('exercise-search-workout').value = '';
+			            document.getElementById('exercise-search-results').innerHTML = '';
+			            loadWorkoutsForPlan(currentWorkout.planId); // Ricarica i workout
+			        })
+			        .catch((error) => {
+			            console.error('Error updating workout:', error);
+			        });
 			}
 			
 			function getDayName(day) {
@@ -1559,11 +1604,6 @@
 			}
 			
 			function addExerciseToSession() {
-			    if (!activeSession) {
-			        alert('Nessuna sessione attiva. Inizia prima una sessione di allenamento.');
-			        closeModal('exercise-modal');
-			        return;
-			    }
 			    const name = document.getElementById('new-exercise-name').value;
 			    const type = document.getElementById('new-exercise-type').value;
 			    const muscles = document.getElementById('new-exercise-muscles').value;
@@ -1572,27 +1612,12 @@
 			    const rest = parseInt(document.getElementById('exercise-rest').value);
 			    const executionType = document.getElementById('new-exercise-execution').value;
 			
-			
 			    if (!name.trim()) {
 			        alert('Inserisci il nome dell\'esercizio');
 			        return;
 			    }
-			    if (currentUser && !currentUser.isAnonymous) {
-			        const exerciseData = {
-			            userId: currentUser.uid,
-			            name: name,
-			            type: type,
-			            muscles: muscles,
-			            description: 'Esercizio personalizzato',
-			            executionType: executionType,
-			            createdAt: new Date()
-			        };
-			
-			db.collection('exercises').add(exerciseData)
-			    .then(() => {
-			        loadExercises(); // Ricarica encyclopedia
-			    });
-			}
+			    
+			    // Crea esercizio per la sessione (senza salvarlo automaticamente nel database)
 			    const exercise = {
 			        id: Date.now().toString(),
 			        name: name,
@@ -1610,6 +1635,26 @@
 			    activeSession.exercises.push(exercise);
 			    updateCurrentExercise();
 			    closeModal('exercise-modal');
+			    
+			    // Solo se l'utente è loggato, chiedi se vuole salvare l'esercizio nell'encyclopedia
+			    if (currentUser && !currentUser.isAnonymous) {
+			        if (confirm('Vuoi salvare questo esercizio nella tua encyclopedia?')) {
+			            const exerciseData = {
+			                userId: currentUser.uid,
+			                name: name,
+			                type: type,
+			                muscles: muscles,
+			                description: 'Esercizio personalizzato',
+			                executionType: executionType,
+			                createdAt: new Date()
+			            };
+			            
+			            db.collection('exercises').add(exerciseData)
+			                .then(() => {
+			                    loadExercises(); // Ricarica encyclopedia
+			                });
+			        }
+			    }
 			}
 			
 			function createNewExercise() {
@@ -2421,19 +2466,19 @@
 			}
 			
 			function loadDemoData() {
-			// Carica dati di esempio senza connessione al database
-			const container = document.getElementById('today-sessions');
-			container.innerHTML = `
-			<div class="empty-state">
-			    <div class="empty-state-icon">🔐</div>
-			    <h3>Accedi per vedere i tuoi allenamenti</h3>
-			    <p>I tuoi dati verranno sincronizzati tra tutti i dispositivi</p>
-			</div>
-			`;
-			
-			// Carica esercizi di default
-			exercises = getDefaultExercises();
-			displayExercises(exercises);
+			    // Carica dati di esempio senza connessione al database
+			    const container = document.getElementById('today-sessions');
+			    container.innerHTML = `
+			        <div class="empty-state">
+			            <div class="empty-state-icon">🔒</div>
+			            <h3>Accedi per vedere i tuoi allenamenti</h3>
+			            <p>I tuoi dati verranno sincronizzati tra tutti i dispositivi</p>
+			        </div>
+			    `;
+			    
+			    // Carica esercizi di default
+			    exercises = getDefaultExercises();
+			    displayExercises(exercises);
 			}
 			
 			function initializeApp() {
