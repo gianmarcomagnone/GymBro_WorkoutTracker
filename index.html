@@ -599,6 +599,9 @@
                             <option value="gambe">Gambe</option>
                             <option value="core">Core</option>
                         </select>
+                        <button class="btn btn-primary" onclick="createNewExercise()" style="width: 100%; margin-top: 10px;">
+                            ➕ Crea Nuovo Esercizio
+                        </button>
                     </div>
                 </div>
 
@@ -883,6 +886,38 @@
             </button>
         </div>
     </div>
+
+    <div class="modal" id="edit-exercise-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Modifica Esercizio</h3>
+                <button class="close-btn" onclick="closeModal('edit-exercise-modal')">&times;</button>
+            </div>
+            <div class="input-group">
+                <label>Nome Esercizio</label>
+                <input type="text" id="edit-exercise-name" placeholder="Nome esercizio">
+            </div>
+            <div class="input-group">
+                <label>Tipo</label>
+                <select id="edit-exercise-type">
+                    <option value="powerlifting">Powerlifting</option>
+                    <option value="calisthenics">Calisthenics</option>
+                    <option value="cardio">Cardio</option>
+                    <option value="hiit">HIIT</option>
+                    <option value="isolation">Isolamento</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Muscoli coinvolti</label>
+                <input type="text" id="edit-exercise-muscles" placeholder="es. Petto, Spalle, Tricipiti">
+            </div>
+            <div class="input-group">
+                <label>Descrizione</label>
+                <textarea id="edit-exercise-description" rows="3"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="saveExerciseChanges()">Salva Modifiche</button>
+        </div>
+    </div>
 </div>
     
     <script>
@@ -1139,7 +1174,59 @@ function loadExercises() {
             displayExercises(exercises);
         });
 }
+let currentEditingExercise = null;
 
+function editExercise(exerciseId) {
+    const exercise = exercises.find(ex => ex.id === exerciseId || ex.name === exerciseId);
+    if (!exercise) return;
+    
+    currentEditingExercise = exercise;
+    
+    document.getElementById('edit-exercise-name').value = exercise.name;
+    document.getElementById('edit-exercise-type').value = exercise.type;
+    document.getElementById('edit-exercise-muscles').value = exercise.muscles;
+    document.getElementById('edit-exercise-description').value = exercise.description || '';
+    
+    document.getElementById('edit-exercise-modal').classList.add('active');
+}
+
+function saveExerciseChanges() {
+    if (!currentEditingExercise) return;
+    
+    const updatedData = {
+        name: document.getElementById('edit-exercise-name').value,
+        type: document.getElementById('edit-exercise-type').value,
+        muscles: document.getElementById('edit-exercise-muscles').value,
+        description: document.getElementById('edit-exercise-description').value
+    };
+    
+    if (currentEditingExercise.id) {
+        // Update in database
+        db.collection('exercises').doc(currentEditingExercise.id)
+            .update(updatedData)
+            .then(() => {
+                closeModal('edit-exercise-modal');
+                loadExercises();
+            });
+    } else {
+        // Update local array for default exercises
+        Object.assign(currentEditingExercise, updatedData);
+        displayExercises(exercises);
+        closeModal('edit-exercise-modal');
+    }
+}
+
+function deleteExercise(exerciseId) {
+    if (!exerciseId) return;
+    
+    if (confirm('Vuoi eliminare questo esercizio?')) {
+        db.collection('exercises').doc(exerciseId).delete()
+            .then(() => {
+                loadExercises();
+            })
+            .catch((error) => console.error('Error deleting exercise:', error));
+    }
+}
 function getDefaultExercises() {
     return [
         {
@@ -1196,6 +1283,14 @@ function displayExercises(exercisesList) {
                 <p><strong>Muscoli:</strong> ${exercise.muscles}</p>
                 <p><strong>Descrizione:</strong> ${exercise.description}</p>
                 <p><strong>Esecuzione:</strong> ${exercise.executionType || 'Rep(+kg)*Serie'}</p>
+                <div style="margin-top: 10px;">
+                    <button class="btn btn-small btn-secondary" onclick="editExercise('${exercise.id || exercise.name}')">
+                        ✏️ Modifica
+                    </button>
+                    <button class="btn btn-small btn-secondary" onclick="deleteExercise('${exercise.id}')" style="background: #f44336;">
+                        🗑️ Elimina
+                    </button>
+                </div>
             </div>
         `;
     });
@@ -1565,7 +1660,22 @@ function updateCalendarData() {
                 alert('Inserisci il nome dell\'esercizio');
                 return;
             }
-
+            if (currentUser && !currentUser.isAnonymous) {
+                const exerciseData = {
+                    userId: currentUser.uid,
+                    name: name,
+                    type: type,
+                    muscles: muscles,
+                    description: 'Esercizio personalizzato',
+                    executionType: executionType,
+                    createdAt: new Date()
+                };
+        
+        db.collection('exercises').add(exerciseData)
+            .then(() => {
+                loadExercises(); // Ricarica encyclopedia
+            });
+    }
             const exercise = {
                 id: Date.now().toString(),
                 name: name,
@@ -1583,12 +1693,16 @@ function updateCalendarData() {
             activeSession.exercises.push(exercise);
             updateCurrentExercise();
             closeModal('exercise-modal');
-            
-            // Clear exercise form
+        }
+        
+        function createNewExercise() {
+            document.getElementById('exercise-modal').classList.add('active');
+            // Clear form
             document.getElementById('new-exercise-name').value = '';
             document.getElementById('new-exercise-muscles').value = '';
         }
-        
+
+
         function updateCurrentExercise() {
             if (!activeSession || activeSession.exercises.length === 0) {
                 document.getElementById('current-exercise').innerHTML = `
@@ -1653,10 +1767,24 @@ function updateCalendarData() {
                     <button class="btn btn-primary" onclick="addVideoRecording()" style="margin-top: 10px;">
                         🎥 Aggiungi Video
                     </button>
+                    <button class="btn btn-secondary" onclick="removeCurrentExercise()" style="background: #f44336; margin-top: 10px;">
+                        🗑️ Rimuovi Esercizio
+                    </button>
                 </div>
             `;
         }
-
+        function removeCurrentExercise() {
+                if (!activeSession) return;
+                
+                const currentIndex = activeSession.exercises.findIndex(ex => !ex.completed);
+                if (currentIndex === -1) return;
+                
+                if (confirm('Vuoi rimuovere questo esercizio dalla sessione?')) {
+                    activeSession.exercises.splice(currentIndex, 1);
+                    updateCurrentExercise();
+                }
+            }
+        
         function generateSetInputs(executionType, setData, setIndex, completed) {
             const disabled = completed ? 'disabled' : '';
             
@@ -2304,6 +2432,9 @@ function displaySessionDetails(session) {
             <div class="modal-header">
                 <h3>Dettagli Sessione</h3>
                 <button class="close-btn" onclick="this.parentElement.parentElement.parentElement.remove()">&times;</button>
+                <button class="btn btn-secondary" onclick="deleteSession('${sessionId}')" style="background: #f44336;">
+                🗑️ Elimina Sessione
+            </button>
             </div>
             <div class="card">
                 <h4>${session.name}</h4>
@@ -2326,7 +2457,18 @@ function displaySessionDetails(session) {
         document.addEventListener('DOMContentLoaded', function() {
             initializeApp();
         });
-
+        
+function deleteSession(sessionId) {
+    if (confirm('Sei sicuro di voler eliminare questa sessione?')) {
+        db.collection('sessions').doc(sessionId).delete()
+            .then(() => {
+                document.querySelector('.modal').remove();
+                loadTodaySessions();
+                updateCalendarData();
+            })
+            .catch((error) => console.error('Error deleting session:', error));
+    }
+}
 function signInWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.addScope('profile');
